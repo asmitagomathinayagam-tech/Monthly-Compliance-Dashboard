@@ -4,6 +4,9 @@ import plotly.graph_objects as go
 import gspread
 from google.oauth2.service_account import Credentials
 
+# ---------------------------------------------------
+# PAGE CONFIG
+# ---------------------------------------------------
 st.set_page_config(
     page_title="Plug Statements Compliance Dashboard",
     layout="wide",
@@ -29,35 +32,36 @@ def connect():
 def load_data():
     client = connect()
 
+    # 🔴 PASTE YOUR GOOGLE SHEET FULL URL BELOW
     spreadsheet = client.open_by_url(
         "https://docs.google.com/spreadsheets/d/1n5XAAZV6yejTTD1yV_wAfLLBsidArbsR4OhlU1SqzMQ/edit?usp=sharing"
     )
 
-    # Print available sheet names for safety
-    sheet_names = [ws.title for ws in spreadsheet.worksheets()]
-    st.write("Available Sheets:", sheet_names)
-
-    sheet = spreadsheet.worksheet("PlugStatements_2026_02_Consolidate sheet")
+    # ✅ Correct Sheet Name
+    sheet = spreadsheet.worksheet("Summary compliance")
 
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
 
+# ---------------------------------------------------
+# LOAD DATA
+# ---------------------------------------------------
 df = load_data()
 
-# ---------------------------------------------------
-# CLEANING
-# ---------------------------------------------------
 df.columns = df.columns.str.strip()
 
+# Ensure required columns exist
 required_cols = ["Month", "Compliance %"]
 
 for col in required_cols:
     if col not in df.columns:
-        st.error(f"Column '{col}' not found in sheet.")
+        st.error(f"Column '{col}' not found in 'Summary compliance' sheet.")
         st.stop()
 
-# Clean %
+# ---------------------------------------------------
+# CLEAN DATA
+# ---------------------------------------------------
 df["Compliance %"] = (
     df["Compliance %"]
     .astype(str)
@@ -66,10 +70,9 @@ df["Compliance %"] = (
 
 df["Compliance %"] = pd.to_numeric(df["Compliance %"], errors="coerce")
 
-# Convert Month to datetime
 df["Month_Date"] = pd.to_datetime(df["Month"], errors="coerce")
 
-# Sort DESCENDING → Jan 2026 to Jan 2025
+# Sort Latest → Oldest (Jan 2026 → Jan 2025)
 df = df.sort_values("Month_Date", ascending=False)
 
 # ---------------------------------------------------
@@ -101,9 +104,9 @@ col2.metric(
 st.markdown("---")
 
 # ---------------------------------------------------
-# TARGET LINE
+# TARGET CONFIG
 # ---------------------------------------------------
-TARGET = 97  # change if needed
+TARGET = 97  # Change SLA target if needed
 
 colors = [
     "#2E8B57" if val >= TARGET else "#D62728"
@@ -115,6 +118,7 @@ colors = [
 # ---------------------------------------------------
 fig = go.Figure()
 
+# Bar Chart
 fig.add_trace(go.Bar(
     x=df["Month"],
     y=df["Compliance %"],
@@ -123,6 +127,7 @@ fig.add_trace(go.Bar(
     textposition="outside",
 ))
 
+# Trend Line
 fig.add_trace(go.Scatter(
     x=df["Month"],
     y=df["Compliance %"],
@@ -130,6 +135,7 @@ fig.add_trace(go.Scatter(
     line=dict(width=3),
 ))
 
+# SLA Target Line
 fig.add_hline(
     y=TARGET,
     line_dash="dash",
