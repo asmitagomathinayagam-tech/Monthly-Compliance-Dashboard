@@ -51,16 +51,17 @@ df["Compliance %"] = df["Compliance %"].apply(clean_pct)
 df["Non Compliance %"] = df["Non Compliance %"].apply(clean_pct)
 df["Month_Date"] = pd.to_datetime(df["Month"], errors="coerce")
 
-# Sort chronologically (Jan 2025 -> Jan 2026) for the trend line to make sense
-df = df.sort_values("Month_Date", ascending=True)
+# REVERSE ORDER: Sort from Newest (Jan 2026) to Oldest (Jan 2025)
+df = df.sort_values("Month_Date", ascending=False)
 
 # ---------------------------------------------------
 # DASHBOARD HEADER & KPIs
 # ---------------------------------------------------
-st.markdown("## 📊 Plug Statements - Performance Trend Analysis")
+st.markdown("## 📊 Plug Statements - Unified Performance View")
 
-latest = df.iloc[-1]
-previous = df.iloc[-2] if len(df) > 1 else latest
+# Calculation for KPIs (Latest vs. Previous)
+latest = df.iloc[0]
+previous = df.iloc[1] if len(df) > 1 else latest
 avg_comp = df["Compliance %"].mean()
 
 col1, col2, col3 = st.columns(3)
@@ -68,11 +69,11 @@ col1, col2, col3 = st.columns(3)
 col1.metric(
     label=f"Current Compliance ({latest['Month']})",
     value=f"{latest['Compliance %']:.2f}%",
-    delta=f"{latest['Compliance %'] - previous['Compliance %']:.2f}% vs Last Month"
+    delta=f"{latest['Compliance %'] - previous['Compliance %']:.2f}% vs Prev Month"
 )
 
 col2.metric(
-    label="Average Compliance (YTD)",
+    label="Average Annual Compliance",
     value=f"{avg_comp:.2f}%"
 )
 
@@ -80,65 +81,66 @@ col3.metric(
     label="Current Non-Compliance",
     value=f"{latest['Non Compliance %']:.2f}%",
     delta=f"{latest['Non Compliance %'] - previous['Non Compliance %']:.2f}%",
-    delta_color="inverse" # Red if non-compliance increases
+    delta_color="inverse"
 )
 
 st.markdown("---")
 
 # ---------------------------------------------------
-# CHART: GROUPED BARS + COMPLIANCE TREND LINE
+# CHART: REVERSED GROUPED BARS + UNIFIED TREND
 # ---------------------------------------------------
+# Define a unified color for Compliance and Trend
+UNIFIED_COLOR = "#008080" # Deep Teal
+
 fig = go.Figure()
 
-# 1. Trace for Compliance Bars
+# 1. Trace for Compliance Bars (Teal)
 fig.add_trace(go.Bar(
     x=df["Month"],
     y=df["Compliance %"],
     name='Met Cases (Compliance)',
-    marker_color='#2E8B57', # Forest Green
-    opacity=0.7,
+    marker_color=UNIFIED_COLOR,
+    opacity=0.6, # Slightly transparent to let the line pop
     text=df["Compliance %"].apply(lambda x: f"{x:.1f}%"),
     textposition='inside'
 ))
 
-# 2. Trace for Non-Compliance Bars
+# 2. Trace for Non-Compliance Bars (Red)
 fig.add_trace(go.Bar(
     x=df["Month"],
     y=df["Non Compliance %"],
     name='Non-Compliance',
-    marker_color='#D62728', # Red
+    marker_color='#D62728',
     text=df["Non Compliance %"].apply(lambda x: f"{x:.1f}%"),
     textposition='outside'
 ))
 
-# 3. Trace for Trend Line (Met Cases)
+# 3. Trace for Trend Line (Teal - Unified with Bars)
 fig.add_trace(go.Scatter(
     x=df["Month"],
     y=df["Compliance %"],
     name='Compliance Trend',
     mode='lines+markers',
-    line=dict(color='#1B4D3E', width=4, shape='spline'), # Darker green, smooth curve
-    marker=dict(size=8, symbol='diamond')
+    line=dict(color=UNIFIED_COLOR, width=4, shape='spline'), # Same Teal, thicker line
+    marker=dict(size=10, symbol='circle', line=dict(color='white', width=2))
 ))
 
 # Styling the layout
 fig.update_layout(
     barmode='group',
     height=600,
-    title="Monthly Compliance Growth & Error Rates",
-    xaxis_title="Reporting Month",
+    xaxis_title="Reporting Month (Latest → Oldest)",
     yaxis_title="Percentage (%)",
     template="plotly_white",
     hovermode="x unified",
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    # Range set to show bars clearly; zoomed in slightly on the top
-    yaxis=dict(range=[0, 110]) 
+    yaxis=dict(range=[0, 110])
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------
-# RAW DATA SUMMARY
+# DATA SUMMARY
 # ---------------------------------------------------
-st.markdown("### 📋 Data Summary")
-st.dataframe(df[["Month", "Compliance %", "Non Compliance %"]].set_index("Month"), use_container_width=True)
+st.markdown("### 📋 Detailed Records")
+st.dataframe(df[["Month", "Compliance %", "Non Compliance %"]], use_container_width=True)
