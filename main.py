@@ -33,7 +33,7 @@ def load_data():
     spreadsheet = client.open("PlugStatements_2026_02_Consolidate sheet")
 
     # Only load this specific sheet
-    sheet = spreadsheet.worksheet("PlugStatements_2026_02_Consolidate")
+    sheet = spreadsheet.worksheet("PlugStatements_2026_02_Consolidate sheet")
 
     data = sheet.get_all_records()
     return pd.DataFrame(data)
