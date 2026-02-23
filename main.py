@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 st.set_page_config(
-    page_title="Monthly Compliance Dashboard",
+    page_title="Plug Statements Compliance Dashboard",
     layout="wide",
     page_icon="📊"
 )
@@ -28,8 +28,13 @@ def connect():
 @st.cache_data(ttl=300)
 def load_data():
     client = connect()
-    spreadsheet = client.open("Non compliance 2025_Jan to 2026_Jan")
+
+    # ⚠️ IMPORTANT: Replace with your actual spreadsheet name
+    spreadsheet = client.open("PlugStatements_2026_02_Consolidate sheet")
+
+    # Only load this specific sheet
     sheet = spreadsheet.worksheet("PlugStatements_2026_02_Consolidate")
+
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
@@ -41,94 +46,97 @@ df = load_data()
 # ---------------------------------------------------
 df.columns = df.columns.str.strip()
 
+required_cols = ["Month", "Compliance %"]
+
+for col in required_cols:
+    if col not in df.columns:
+        st.error(f"Column '{col}' not found in sheet.")
+        st.stop()
+
+# Clean %
 df["Compliance %"] = (
     df["Compliance %"]
     .astype(str)
-    .str.replace("%", "")
+    .str.replace("%", "", regex=False)
 )
 
 df["Compliance %"] = pd.to_numeric(df["Compliance %"], errors="coerce")
 
+# Convert Month to datetime
 df["Month_Date"] = pd.to_datetime(df["Month"], errors="coerce")
-df = df.sort_values("Month_Date")
+
+# Sort DESCENDING → Jan 2026 to Jan 2025
+df = df.sort_values("Month_Date", ascending=False)
+
+# ---------------------------------------------------
+# TITLE
+# ---------------------------------------------------
+st.markdown("## 📊 Plug Statements - Monthly Compliance Overview")
 
 # ---------------------------------------------------
 # KPI SECTION
 # ---------------------------------------------------
-st.markdown("## 📊 Plug Statements - Monthly Compliance Overview")
-
-latest = df.iloc[-1]
-previous = df.iloc[-2] if len(df) > 1 else latest
+latest = df.iloc[0]
+previous = df.iloc[1] if len(df) > 1 else latest
 
 delta = latest["Compliance %"] - previous["Compliance %"]
 
-col1, col2 = st.columns([2,1])
+col1, col2 = st.columns(2)
 
-with col1:
-    st.metric(
-        label=f"Latest Compliance ({latest['Month']})",
-        value=f"{latest['Compliance %']:.2f}%",
-        delta=f"{delta:.2f}% vs Previous Month"
-    )
+col1.metric(
+    label=f"Latest Compliance ({latest['Month']})",
+    value=f"{latest['Compliance %']:.2f}%",
+    delta=f"{delta:.2f}% vs Previous Month"
+)
 
-with col2:
-    avg_compliance = df["Compliance %"].mean()
-    st.metric(
-        label="Average Compliance",
-        value=f"{avg_compliance:.2f}%"
-    )
+col2.metric(
+    label="Average Compliance",
+    value=f"{df['Compliance %'].mean():.2f}%"
+)
 
 st.markdown("---")
 
 # ---------------------------------------------------
-# TARGET
+# TARGET LINE
 # ---------------------------------------------------
 TARGET = 97  # change if needed
 
-# Color coding
 colors = [
     "#2E8B57" if val >= TARGET else "#D62728"
     for val in df["Compliance %"]
 ]
 
 # ---------------------------------------------------
-# PROFESSIONAL CHART
+# CHART
 # ---------------------------------------------------
 fig = go.Figure()
 
-# Bars
 fig.add_trace(go.Bar(
     x=df["Month"],
     y=df["Compliance %"],
     marker_color=colors,
     text=[f"{v:.2f}%" for v in df["Compliance %"]],
     textposition="outside",
-    name="Compliance %"
 ))
 
-# Line overlay
 fig.add_trace(go.Scatter(
     x=df["Month"],
     y=df["Compliance %"],
     mode="lines+markers",
-    line=dict(color="#1f77b4", width=3),
-    name="Trend"
+    line=dict(width=3),
 ))
 
-# Target line
 fig.add_hline(
     y=TARGET,
     line_dash="dash",
-    line_color="orange",
     annotation_text=f"SLA Target ({TARGET}%)",
     annotation_position="top right"
 )
 
 fig.update_layout(
     height=550,
-    title="Monthly Compliance Performance",
     yaxis=dict(range=[90, 100], title="Compliance %"),
-    xaxis_title="Month",
+    xaxis_title="Month (Latest → Oldest)",
     template="plotly_white",
     showlegend=False
 )
@@ -138,17 +146,17 @@ st.plotly_chart(fig, use_container_width=True)
 st.markdown("---")
 
 # ---------------------------------------------------
-# INSIGHT BOX
+# EXECUTIVE INSIGHT
 # ---------------------------------------------------
 if latest["Compliance %"] >= TARGET:
-    insight = "🟢 Compliance is meeting SLA target."
+    status = "🟢 Meeting SLA Target"
 else:
-    insight = "🔴 Compliance is below SLA target. Immediate focus required."
+    status = "🔴 Below SLA Target – Attention Required"
 
 st.info(f"""
 ### 📌 Executive Insight
 - Latest Month: **{latest['Month']}**
 - Compliance: **{latest['Compliance %']:.2f}%**
 - SLA Target: **{TARGET}%**
-- Status: {insight}
+- Status: {status}
 """)
