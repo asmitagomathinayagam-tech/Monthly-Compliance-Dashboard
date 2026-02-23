@@ -29,10 +29,14 @@ def connect():
 def load_data():
     client = connect()
 
-    # ⚠️ IMPORTANT: Replace with your actual spreadsheet name
-    spreadsheet = client.open("PlugStatements_2026_02_Consolidate sheet")
+    spreadsheet = client.open_by_url(
+        "https://docs.google.com/spreadsheets/d/1n5XAAZV6yejTTD1yV_wAfLLBsidArbsR4OhlU1SqzMQ/edit?usp=sharing"
+    )
 
-    # Only load this specific sheet
+    # Print available sheet names for safety
+    sheet_names = [ws.title for ws in spreadsheet.worksheets()]
+    st.write("Available Sheets:", sheet_names)
+
     sheet = spreadsheet.worksheet("PlugStatements_2026_02_Consolidate sheet")
 
     data = sheet.get_all_records()
