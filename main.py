@@ -130,7 +130,7 @@ fig.add_trace(go.Scatter(
 fig.update_layout(
     barmode='group',
     height=600,
-    xaxis_title="Month (Jan 2026 → Jan 2025)",
+    xaxis_title="Month (June 2026 → June 2025)",
     yaxis_title="Percentage (%)",
     template="plotly_white",
     hovermode="x unified",
